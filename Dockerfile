@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
-ARG QE_VERSION=7.4.1
+ARG QE_VERSION=7.5
 WORKDIR /src
 RUN wget -q -O qe.tar.gz \
         "https://gitlab.com/QEF/q-e/-/archive/qe-${QE_VERSION}/q-e-qe-${QE_VERSION}.tar.gz" \
@@ -33,7 +33,7 @@ RUN wget -q -O qe.tar.gz \
 # Final stage: ship only /opt/qe on top of debian:bookworm-slim. Downstream
 # images FROM this and add their own runtime libs + entrypoint.
 FROM debian:bookworm-slim
-ARG QE_VERSION=7.4.1
+ARG QE_VERSION=7.5
 COPY --from=qe-builder /opt/qe /opt/qe
 LABEL org.opencontainers.image.title="qe-base" \
       org.opencontainers.image.version="${QE_VERSION}" \

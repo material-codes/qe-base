@@ -8,7 +8,7 @@ Designed as a thin, predictable base layer that downstream containers can `FROM`
 
 **Good fits:**
 - **CI fixtures** that need a real `pw.x` to test input generation, output parsing, or end-to-end workflow logic
-- **Reproducibility artifacts** for published calculations — image tags are immutable, so `ghcr.io/material-codes/qe-base:7.4.1` ships exactly the QE binary that was current at release time
+- **Reproducibility artifacts** for published calculations — image tags are immutable, so `ghcr.io/material-codes/qe-base:7.5` ships exactly the QE binary that was current at release time
 - **Education / classroom use** where students need a working QE without fighting a source build
 - **Workflow runners** (e.g. material/core's `qerunner`) that want a known-good binary as a base layer
 - **Small-to-medium calculations** that fit on a single node and don't need MPI
@@ -44,12 +44,12 @@ The build is two-stage: a `qe-builder` stage with the full compile toolchain (CM
 ## Pull
 
 ```sh
-docker pull ghcr.io/material-codes/qe-base:7.4.1
+docker pull ghcr.io/material-codes/qe-base:7.5
 ```
 
 | Tag pattern | Meaning |
 |---|---|
-| `<version>` (e.g. `7.4.1`) | Pinned to a specific QE release. Immutable. |
+| `<version>` (e.g. `7.5`) | Pinned to a specific QE release. Immutable. |
 | `latest` | Tracks the most recent release tag. Moves over time. |
 
 For reproducibility, **always pin a specific version** in production references; reserve `latest` for exploration.
@@ -57,7 +57,7 @@ For reproducibility, **always pin a specific version** in production references;
 ## Use as a base
 
 ```dockerfile
-FROM ghcr.io/material-codes/qe-base:7.4.1
+FROM ghcr.io/material-codes/qe-base:7.5
 
 # Add the runtime libraries QE links against. Versions match Debian bookworm.
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -80,13 +80,13 @@ COPY --from=ghcr.io/material-codes/qe-pseudos:pseudodojo-v0.4 /pseudo /opt/pseud
 ## Build locally
 
 ```sh
-docker build --build-arg QE_VERSION=7.4.1 -t qe-base:7.4.1 .
+docker build --build-arg QE_VERSION=7.5 -t qe-base:7.5 .
 ```
 
 On Apple Silicon (M1/M2/M3), the build runs under qemu emulation when targeting `linux/amd64` — expect noticeably longer compile times (~10× slower) than on a native amd64 host. For local iteration on Apple Silicon, build natively:
 
 ```sh
-docker build --platform linux/arm64 --build-arg QE_VERSION=7.4.1 -t qe-base:7.4.1-arm64 .
+docker build --platform linux/arm64 --build-arg QE_VERSION=7.5 -t qe-base:7.5-arm64 .
 ```
 
 The published GHCR image is `linux/amd64` only.
@@ -101,9 +101,9 @@ The trigger is `tags: ['v*']`, so unrelated tags like `docs-v1` would also fire 
 
 ## Versioning policy
 
-Image tags follow QE's upstream release versioning (e.g. QE release `7.4.1` → image tag `7.4.1`). Patch releases get their own image tag and replace `latest`.
+Image tags follow QE's upstream release versioning (e.g. QE release `7.5` → image tag `7.5`). Patch releases get their own image tag and replace `latest`.
 
-If a non-QE build dependency (Debian base, build-arg defaults) needs to change between QE releases, cut a suffixed tag like `v7.4.1-1` to keep the QE-version semantics unambiguous and preserve the immutability of the original `7.4.1` image.
+If a non-QE build dependency (Debian base, build-arg defaults) needs to change between QE releases, cut a suffixed tag like `v7.5-1` to keep the QE-version semantics unambiguous and preserve the immutability of the original `7.5` image.
 
 ## Licensing
 
