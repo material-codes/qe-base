@@ -1,0 +1,75 @@
+name: upstream-watch
+
+# Keeps the repo "alive": weekly check for a newer upstream Quantum ESPRESSO release.
+# Opens an issue when one appears — a human still cuts the release tag.
+on:
+  schedule:
+    - cron: '23 6 * * 1'   # Mondays 06:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for newer Quantum ESPRESSO release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          current="$(grep -m1 -oE 'QE_VERSION=[0-9.]+' Dockerfile | cut -d= -f2)"
+          echo "Pinned QE: $current"
+
+          # QE source lives on GitLab (QEF/q-e). Stable releases are tags of the
+          # form qe-X.Y or qe-X.Y.Z — exclude RCs (-rc.N), -devel, and variant
+          # tags (e.g. qe-7.5CN, qe-7.2-omp5) by matching pure version tags only.
+          latest="$(curl -fsSL 'https://gitlab.com/api/v4/projects/QEF%2Fq-e/repository/tags?per_page=100' \
+            | grep -oE '"name":"qe-[0-9]+\.[0-9]+(\.[0-9]+)?"' \
+            | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' \
+            | sort -V | tail -1 || true)"
+          if [ -z "$latest" ]; then
+            echo "Could not read latest version from GitLab API; skipping."; exit 0
+          fi
+          echo "Latest upstream stable: $latest"
+
+          if [ "$current" = "$latest" ]; then
+            echo "Up to date."; exit 0
+          fi
+          newest="$(printf '%s\n%s\n' "$current" "$latest" | sort -V | tail -1)"
+          if [ "$newest" != "$latest" ]; then
+            echo "Pinned ($current) is newer than/equal to upstream ($latest); nothing to do."; exit 0
+          fi
+
+          # Confirm the archive tarball our Dockerfile downloads actually exists.
+          code="$(curl -fsSL -o /dev/null -w '%{http_code}' \
+            "https://gitlab.com/QEF/q-e/-/archive/qe-${latest}/q-e-qe-${latest}.tar.gz" || true)"
+          if [ "$code" != "200" ]; then
+            echo "Upstream has $latest but archive tarball returns HTTP $code; skipping."; exit 0
+          fi
+
+          title="Upstream Quantum ESPRESSO ${latest} available (pinned: ${current})"
+          if gh issue list --state open --search "in:title \"${title}\"" \
+               --json title --jq '.[].title' | grep -Fxq "$title"; then
+            echo "Issue already open: $title"; exit 0
+          fi
+
+          body="$(printf '%s\n' \
+            "Quantum ESPRESSO **${latest}** is available upstream (GitLab archive tarball verified). This repo is pinned to **${current}**." \
+            "" \
+            "To release (per README \"Bumping the QE version\"):" \
+            "1. Edit \`ARG QE_VERSION\` default in \`Dockerfile\` (both stages) to \`${latest}\`." \
+            "2. Update the version examples in \`README.md\`." \
+            "3. Commit to \`main\`." \
+            "4. Cut the tag: \`git tag v${latest} && git push --tags\` — GHA publishes \`ghcr.io/material-codes/qe-base:${latest}\`." \
+            "" \
+            "Review the upstream release notes before releasing — a minor-version bump can shuffle CMake flags or build targets (this image builds only the \`pw pp\` targets)." \
+            "" \
+            "_Opened automatically by the upstream-watch workflow._")"
+
+          gh issue create --title "$title" --body "$body"
